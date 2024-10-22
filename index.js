@@ -2,20 +2,21 @@ const ndi = require('bindings')('ndi.node');
 
 class Receiver {
 
-    finder = new ndi.Finder()   
+    finder = new ndi.Finder()
+    recv = null
 
     constructor(name) {
         this.name = name
     }
 
     video() {
-        if (this.receiver) {
-            return this.receiver.video()
+        if (this.recv) {
+            return this.recv.video()
         } else {
             let match = this.finder.find().filter((o, i) => o.name.includes(this.name)).pop()
             if (match) {
-                this.receiver = new ndi.Receiver(match)
-                console.log("found NDI source", this.name, this.receiver)
+                this.recv = new ndi.Receiver(match)
+                console.log("found NDI source", this.name)
             }
         }
     }
