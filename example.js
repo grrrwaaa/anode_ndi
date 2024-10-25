@@ -38,6 +38,6 @@ setInterval(function() {
     // it won't wait. If there's no new video frame, it returns null
     let frame = receiver.video()
     // frame has xres, yres, bytelength, and data (Uint8Array)
-    if (frame) console.log("got frame", frame.bytelength, frame)
+    if (frame) console.log("got frame", frame.byteLength, frame)
 
 }, 30) 

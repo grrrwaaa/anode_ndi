@@ -32,7 +32,7 @@ struct Sender : public Napi::ObjectWrap<Sender> {
 		frame.yres = 240;
 		frame.FourCC = NDIlib_FourCC_video_type_BGRA;  // 4:4:4:4 
 		//frame.FourCC = NDIlib_FourCC_video_type_RGBA;  // 4:4:4:4 
-		frame.frame_rate_N = 30;
+		frame.frame_rate_N = 60;
 		frame.frame_rate_D = 1;
 		frame.picture_aspect_ratio = float(frame.xres)/float(frame.yres);
 		frame.frame_format_type = NDIlib_frame_format_type_progressive;
@@ -199,7 +199,7 @@ struct Receiver : public Napi::ObjectWrap<Receiver> {
         Frame.Set("xres", frame.xres);
         Frame.Set("yres", frame.yres);
         bytelength = frame.xres * frame.yres * 4;
-        Frame.Set("bytelength", bytelength);
+        Frame.Set("byteLength", bytelength);
 
         // reallocate our buffer?
         Napi::TypedArrayOf<uint8_t> arr;
@@ -216,6 +216,44 @@ struct Receiver : public Napi::ObjectWrap<Receiver> {
             arr = Napi::TypedArrayOf<uint8_t>::New(env, bytelength);
             Frame.Set("data", arr);
         }
+
+        // now we can copy frame.p_data into arr:
+        memcpy(arr.Data(), frame.p_data, bytelength);
+
+        return Frame;
+    }
+
+    // arg: timeout
+    Napi::Value video_into(const Napi::CallbackInfo& info) {
+		Napi::Env env = info.Env();
+		Napi::Object This = info.This().As<Napi::Object>();
+
+        Napi::TypedArrayOf<uint8_t> arr;
+        if (info[0].IsTypedArray()) arr = info[0].As<Napi::TypedArrayOf<uint8_t>>();
+
+        uint32_t timeout_ms = info[1].ToNumber().Uint32Value();
+
+        auto Frame = This.Get("frame").ToObject();
+
+        // This function will return NDIlib_frame_type_none if no data is received within the specified timeout and
+        // NDIlib_frame_type_error if the connection is lost. Buffers captured with this must be freed with the
+        // appropriate free function below.
+        auto res = NDIlib_recv_capture_v2(recv, &frame, nullptr, nullptr, timeout_ms);
+        switch (res) {
+            // no data received
+            // case NDIlib_frame_type_none: return env.Null();
+            case NDIlib_frame_type_error: printf("lost connection\n"); return env.Null();
+            case NDIlib_frame_type_video: break;
+            default: return env.Null();
+        }
+
+        Frame.Set("xres", frame.xres);
+        Frame.Set("yres", frame.yres);
+        bytelength = frame.xres * frame.yres * 4;
+        Frame.Set("byteLength", bytelength);
+        
+        // verify it is large enough:
+        if (arr.ByteLength() < bytelength) Napi::Error::New(env, "too few bytes for resolution").ThrowAsJavaScriptException();
 
         // now we can copy frame.p_data into arr:
         memcpy(arr.Data(), frame.p_data, bytelength);
@@ -330,7 +368,7 @@ public:
             // This method is used to hook the accessor and method callbacks
             Napi::Function ctor = Receiver::DefineClass(env, "Receiver", {
                 Receiver::InstanceMethod<&Receiver::video>("video"),
-                // Receiver::InstanceMethod<&Receiver::send>("send"),
+                Receiver::InstanceMethod<&Receiver::video_into>("video_into"),
             });
 
             // Create a persistent reference to the class constructor.

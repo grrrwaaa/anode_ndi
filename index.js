@@ -9,15 +9,27 @@ class Receiver {
         this.name = name
     }
 
+    search() {
+        let match = this.finder.find().filter((o, i) => o.name.includes(this.name)).pop()
+        if (match) {
+            this.recv = new ndi.Receiver(match)
+            console.log("found NDI source", this.name)
+        }
+    }
+
     video() {
         if (this.recv) {
-            return this.recv.video()
+            return this.recv.video(...arguments)
         } else {
-            let match = this.finder.find().filter((o, i) => o.name.includes(this.name)).pop()
-            if (match) {
-                this.recv = new ndi.Receiver(match)
-                console.log("found NDI source", this.name)
-            }
+            this.search()
+        }
+    }
+
+    video_into() {
+        if (this.recv) {
+            return this.recv.video_into(...arguments)
+        } else {
+            this.search()
         }
     }
 }
